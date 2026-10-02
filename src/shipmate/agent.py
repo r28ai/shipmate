@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
-import os
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
@@ -29,28 +28,11 @@ from langchain_core.tools import tool
 from shipmate import routines
 from shipmate.apps import App
 from shipmate.home import home
+from shipmate.models import model_host
 from shipmate.policy import Policy, is_read
 
 # (tool name, the tool, its arguments) -> "yes" | "no" | "always"
 Ask = Callable[[str, Tool, dict], Awaitable[str]]
-
-DEFAULT_MODELS = (
-    ("ANTHROPIC_API_KEY", "anthropic:claude-sonnet-5"),
-    ("OPENAI_API_KEY", "openai:gpt-5.5"),
-)
-
-
-def model_name(explicit: str | None = None) -> str | None:
-    if explicit or os.environ.get("SHIPMATE_MODEL"):
-        return explicit or os.environ["SHIPMATE_MODEL"]
-    return next((name for key, name in DEFAULT_MODELS if os.environ.get(key)), None)
-
-
-def load_model(name: str) -> Any:
-    from langchain.chat_models import init_chat_model
-
-    return init_chat_model(name)
-
 
 # ------------------------------------------------------------------ the log
 
@@ -72,15 +54,6 @@ def host_of(tool: Tool) -> str:
     except Exception:
         return tool.pack or "unknown"
     return urlparse(str(base)).netloc
-
-
-def model_host(model: Any) -> str:
-    for attr in ("anthropic_api_url", "openai_api_base", "base_url", "fireworks_api_base"):
-        value = getattr(model, attr, None)
-        if isinstance(value, str) and value:
-            return urlparse(value).netloc or value
-    known = {"ChatOpenAI": "api.openai.com", "ChatFireworks": "api.fireworks.ai"}
-    return known.get(type(model).__name__, type(model).__name__)
 
 
 def audit(call: ToolCall, host: str, pack: str | None) -> None:

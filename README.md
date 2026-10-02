@@ -178,12 +178,23 @@ $ shipmate inbox        # read what they found
 
 ## Models
 
-Anthropic or OpenAI out of the box: Claude Sonnet 5 when `ANTHROPIC_API_KEY` is set, otherwise GPT-5.5. Any provider LangChain supports works with `--model`. Open models work too: the session above is Kimi K3 on Fireworks.
+Connect a provider and Shipmate uses its default model:
+
+| `shipmate connect …` | Default model | Needs |
+|---|---|---|
+| `anthropic` | Claude Sonnet 5 | `ANTHROPIC_API_KEY` |
+| `openai` | GPT-5.5 | `OPENAI_API_KEY` |
+| `fireworks` | GLM-5.3 Flash | `FIREWORKS_API_KEY` |
+| `openrouter` | GLM-5.3 Flash | `OPENROUTER_API_KEY` |
+| `together` | GLM-5.3 Flash | `TOGETHER_API_KEY` |
+| `ollama` | a model you've pulled | nothing: it runs on your computer |
+
+GLM-5.3 Flash is the open-model default because Charter's own test harness measured it: 109 of 110 multi-app tasks completed using ToolSearch, the way Shipmate loads tools. Any other model works with `--model` or `$SHIPMATE_MODEL`, written `<provider>:<model>`:
 
 ```console
 $ shipmate --model anthropic:claude-opus-5-5
-$ uv tool install git+https://github.com/r28ai/shipmate@v0.1.1 --with langchain-fireworks
-$ shipmate --model fireworks:accounts/fireworks/models/kimi-k3
+$ shipmate --model openrouter:moonshotai/kimi-k2.6
+$ shipmate --model ollama:qwen3:8b
 ```
 
 ## How it's built

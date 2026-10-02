@@ -135,12 +135,6 @@ APPS: tuple[App, ...] = (
     ),
 )
 
-# The model is an app too: it needs a key, and the key lives with the others.
-MODELS: dict[str, tuple[str, str]] = {
-    "anthropic": ("ANTHROPIC_API_KEY", "console.anthropic.com → API keys"),
-    "openai": ("OPENAI_API_KEY", "platform.openai.com/api-keys"),
-}
-
 
 def find(key: str) -> App | None:
     return next((app for app in APPS if app.key == key), None)

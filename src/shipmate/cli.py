@@ -31,13 +31,14 @@ console = Console()
 
 
 def need_model(explicit: str | None) -> tuple[object, str]:
-    from shipmate.agent import load_model, model_name
+    from shipmate.models import load_model, model_name
 
     name = model_name(explicit)
     if name is None:
         console.print(
-            "No model key yet. Run [bold]shipmate connect anthropic[/] (or openai), "
-            "or pass [bold]--model[/] with any LangChain provider, e.g. fireworks:… or ollama:…"
+            "No model yet. Run [bold]shipmate connect <provider>[/]: anthropic, openai, "
+            "fireworks, openrouter, together or ollama.\n"
+            "Or pass [bold]--model[/] <provider>:<model>."
         )
         raise SystemExit(1)
     try:
@@ -48,18 +49,17 @@ def need_model(explicit: str | None) -> tuple[object, str]:
 
 
 def status_table() -> None:
-    from shipmate.apps import APPS, MODELS
+    from shipmate.apps import APPS
+    from shipmate.models import PROVIDERS, model_name
 
     for app in APPS:
         mark = "[green]●[/]" if app.is_connected() else "[dim]○[/]"
         console.print(f" {mark} [bold]{app.key:<10}[/] {app.label}")
-    from shipmate.agent import model_name
-
     name = model_name()
     mark = "[green]●[/]" if name else "[dim]○[/]"
-    what = name or f"none yet: shipmate connect {' or '.join(MODELS)}"
-    console.print(f" {mark} [bold]{'model':<10}[/] {escape(what)}")
-    console.print("\n[dim]shipmate connect <name> to add one.[/]")
+    console.print(f" {mark} [bold]{'model':<10}[/] {escape(name or 'none yet')}")
+    providers = ", ".join(p.key for p in PROVIDERS)
+    console.print(f"\n[dim]shipmate connect <app>, or a model provider: {providers}.[/]")
 
 
 async def verify(app_key: str) -> None:
@@ -107,8 +107,8 @@ def github_cli_token() -> str | None:
 
 
 def cmd_chat(args: argparse.Namespace) -> None:
-    from shipmate.agent import model_name
     from shipmate.chat import chat
+    from shipmate.models import model_name
 
     no_model = model_name(args.model) is None
     first_time = not (home() / ".welcomed").exists()
@@ -125,18 +125,48 @@ def cmd_connect(args: argparse.Namespace) -> None:
         status_table()
 
 
+def connect_model(key: str) -> None:
+    """Save a provider's key and make its default model the one in use."""
+    from shipmate import models
+
+    provider = models.find(key)
+    assert provider is not None
+    console.print(f"[dim]{provider.how}[/]")
+    if provider.env is None:  # Ollama: no key, pick a model it already has
+        names = models.ollama_models()
+        if names is None:
+            raise SystemExit(
+                f"Ollama isn't running at {models.ollama_url()}. Start it, then try again."
+            )
+        if not names:
+            raise SystemExit(
+                "Ollama has no models yet. Pull one (`ollama pull <model>`), then try again."
+            )
+        for i, name in enumerate(names, 1):
+            console.print(f"  [bold]{i}[/] {escape(name)}")
+        choice = console.input("Which one? (Enter for 1) › ").strip() or "1"
+        if not choice.isdigit() or not 1 <= int(choice) <= len(names):
+            raise SystemExit("Pick one of the numbers shown.")
+        model = f"ollama:{names[int(choice) - 1]}"
+    else:
+        value = getpass.getpass(f"{provider.env}: ").strip()
+        if not value:
+            raise SystemExit(f"Nothing entered for {provider.env}.")
+        save_secret(provider.env, value)
+        assert provider.default is not None
+        model = provider.default
+    save_secret("SHIPMATE_MODEL", model)
+    console.print(f"[green]✓ Shipmate will use {escape(model)}[/]")
+    console.print("[dim]Any other model: --model <provider>:<model>, or set SHIPMATE_MODEL.[/]")
+
+
 def connect(key: str) -> None:
-    from shipmate.apps import MODELS, find
+    from shipmate import models
+    from shipmate.apps import find
 
     key = key.lower()
-    if key in MODELS:
-        env, how = MODELS[key]
-        console.print(f"[dim]{how}[/]")
-        value = getpass.getpass(f"{env}: ").strip()
-        if not value:
-            raise SystemExit(f"Nothing entered for {env}.")
-        save_secret(env, value)
-        console.print(f"[green]✓ saved {env}[/]")
+    if models.find(key):
+        connect_model(key)
         return
 
     app = find(key)
@@ -173,8 +203,15 @@ def welcome(need_model_key: bool) -> None:
     (home() / ".welcomed").touch()
     console.print("[bold]Shipmate[/] runs on your computer, with your own keys.\n")
     if need_model_key:
-        console.print("[bold]Model[/]  [bold]1[/] Anthropic (Claude)   [bold]2[/] OpenAI")
-        connect("openai" if console.input("› ").strip() == "2" else "anthropic")
+        from shipmate.models import PROVIDERS
+
+        console.print("[bold]Model[/]")
+        for i, provider in enumerate(PROVIDERS, 1):
+            console.print(f"  [bold]{i}[/] {provider.label}")
+        choice = console.input("› (Enter for 1) ").strip() or "1"
+        if not choice.isdigit() or not 1 <= int(choice) <= len(PROVIDERS):
+            raise SystemExit("Pick one of the numbers shown.")
+        connect_model(PROVIDERS[int(choice) - 1].key)
     if connected():
         return
     console.print(

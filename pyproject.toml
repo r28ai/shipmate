@@ -14,7 +14,11 @@ dependencies = [
     "charter-ai[langchain]>=0.2.7",
     "langchain>=1.4",
     "langchain-anthropic>=1.0",
+    "langchain-fireworks>=1.7.0",
+    "langchain-ollama>=1.1.0",
     "langchain-openai>=1.0",
+    "langchain-openrouter>=0.2.9",
+    "langchain-together>=0.4.0",
     "rich>=13",
 ]
 

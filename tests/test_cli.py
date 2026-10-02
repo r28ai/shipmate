@@ -45,5 +45,24 @@ def test_a_fine_grained_github_token_is_told_why_notifications_fail(monkeypatch,
     with pytest.raises(SystemExit):
         asyncio.run(verify("github"))
     out = capsys.readouterr().out
-    assert "✓ users_get_authenticated" in out
-    assert "✗ notifications_list: HTTP 403" in out and "gh login" in out
+    assert "✓ users_get_authenticated as @someone" in out
+    assert "✗ notifications_list: HTTP 403" in out and "classic token" in out
+
+
+def test_the_gh_login_prompt_names_the_account_before_using_it(monkeypatch, tmp_path):
+    from shipmate import cli
+
+    monkeypatch.setattr(cli, "github_cli_token", lambda: "gho_main_account_token")
+    monkeypatch.setattr(cli, "github_cli_login", lambda: "mainaccount")
+    prompts = []
+
+    def paste_sandbox_token(prompt=""):
+        prompts.append(prompt)
+        return "github_pat_sandbox"
+
+    monkeypatch.setattr(cli.getpass, "getpass", paste_sandbox_token)
+    monkeypatch.setattr(cli, "verify", lambda key: asyncio.sleep(0))
+    cli.connect("github")
+    assert "@mainaccount" in prompts[0]
+    secrets = (tmp_path / "secrets.env").read_text()
+    assert "GITHUB_TOKEN=github_pat_sandbox" in secrets and "gho_" not in secrets

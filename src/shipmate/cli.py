@@ -63,8 +63,9 @@ def status_table() -> None:
 
 
 HINTS = {
-    "notifications_list": "Fine-grained GitHub tokens can't read notifications at all. Run "
-    "`shipmate connect github` and press Enter to use your gh login, or use a classic token.",
+    "notifications_list": "Fine-grained GitHub tokens can't read notifications at all. "
+    "Everything else works. For notifications, use a classic token with the notifications "
+    "scope, or your gh login.",
 }
 
 
@@ -79,12 +80,13 @@ async def verify(app_key: str) -> None:
         return
     one_service = len({check.split(".")[0] for check in app.verify}) == 1
     passed, failed = [], []
+    account = ""
     for check in app.verify:
         pack, name = check.split(".")
         what = name if one_service and len(app.verify) > 1 else pack
         tool = next(t for t in pack_tools(pack) if t.name == name)
         try:
-            await tool.ainvoke({})
+            result = await tool.ainvoke({})
         except ToolValidationError:
             continue  # this check needs arguments; nothing learned
         except APIError as exc:
@@ -93,11 +95,13 @@ async def verify(app_key: str) -> None:
             failed.append((what, str(exc).splitlines()[0][:160]))
         else:
             passed.append(what)
+            if isinstance(result, dict) and result.get("login") and not account:
+                account = f" as @{result['login']}"  # so a second account can't slip in unnoticed
     if not failed:
-        console.print(f"[green]✓ {app.label} connected.[/]")
+        console.print(f"[green]✓ {app.label} connected{escape(account)}.[/]")
         return
     if passed:
-        console.print(f"[green]✓ {', '.join(passed)}[/]")
+        console.print(f"[green]✓ {', '.join(passed)}{escape(account)}[/]")
     for what, reason in failed:
         console.print(f"✗ {what}: {reason}", style="red", markup=False)
         if what in HINTS:
@@ -110,6 +114,19 @@ def github_cli_token() -> str | None:
     if not shutil.which("gh"):
         return None
     out = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=False)
+    return out.stdout.strip() or None
+
+
+def github_cli_login() -> str | None:
+    """The account the gh login belongs to, from gh's own config: no network, no token."""
+    if not shutil.which("gh"):
+        return None
+    out = subprocess.run(
+        ["gh", "config", "get", "user", "-h", "github.com"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     return out.stdout.strip() or None
 
 
@@ -194,7 +211,9 @@ def connect(key: str) -> None:
         console.print(f"[dim]{app.how}[/]")
         for env in app.env:
             if env == "GITHUB_TOKEN" and github_cli_token():
-                value = getpass.getpass(f"{env} (Enter to use your gh login): ").strip()
+                who = github_cli_login()
+                login = f"your gh login, @{who}" if who else "your gh login"
+                value = getpass.getpass(f"{env} (Enter to use {login}): ").strip()
                 value = value or github_cli_token() or ""
             elif env == "SHOPIFY_SHOP":
                 value = input(f"{env} (your-store.myshopify.com): ").strip()

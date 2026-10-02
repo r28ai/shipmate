@@ -62,7 +62,7 @@ titled "Shipmate test" (no body) on r28ai/charter.
 ## Try it in 60 seconds
 
 ```console
-$ uv tool install git+https://github.com/r28ai/shipmate@v0.1.1
+$ uv tool install git+https://github.com/r28ai/shipmate@v0.1.2
 $ shipmate
 Shipmate runs on your computer, with your own keys.
 
@@ -85,7 +85,7 @@ GITHUB_TOKEN (Enter to use your gh login): ••••
 
 Then ask it what needs your attention on GitHub today. Gmail and Calendar take five more minutes, [once](#connect-your-apps).
 
-No `uv`? `pip install git+https://github.com/r28ai/shipmate@v0.1.1` works too.
+No `uv`? `pip install git+https://github.com/r28ai/shipmate@v0.1.2` works too.
 
 ## Want these tools in your own agent?
 

@@ -69,9 +69,13 @@ async def ask(name: str, target: Tool, args: dict) -> str:
         )
     )
     while True:
-        reply = await asyncio.to_thread(
-            console.input, "  Run it? [bold]y[/]es / [bold]n[/]o / [bold]a[/]lways for this tool › "
-        )
+        try:
+            reply = await asyncio.to_thread(
+                console.input,
+                "  Run it? [bold]y[/]es / [bold]n[/]o / [bold]a[/]lways for this tool › ",
+            )
+        except EOFError:  # nobody left to answer, so the safe answer
+            return "no"
         reply = reply.strip().lower()
         if reply in ("y", "yes"):
             return "yes"
@@ -79,6 +83,7 @@ async def ask(name: str, target: Tool, args: dict) -> str:
             return "no"
         if reply in ("a", "always"):
             return "always"
+        console.print("  [dim]Answer y, n or a.[/]")
 
 
 def tally(messages: list[BaseMessage], api: set[str], writes: set[str]) -> str:

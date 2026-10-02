@@ -22,7 +22,7 @@ class App:
     packs: tuple[str, ...]
     env: tuple[str, ...]
     how: str
-    verify: str | None = None  # a cheap read, "pack.tool", run once after connecting
+    verify: tuple[str, ...] = ()  # cheap reads, "pack.tool", run once after connecting
     connected_if: Callable[[], bool] | None = None
     example: str = ""  # something to try first
 
@@ -49,7 +49,7 @@ APPS: tuple[App, ...] = (
         ("GOOGLE_TOKEN_FILE",),
         "Signs in through your browser with your own Google OAuth client. "
         "`shipmate connect google` walks you through it.",
-        verify="gmail.labels_list",
+        verify=("gmail.labels_list", "gcalendar.calendar_list_list", "gdrive.files_list"),
         example="What's on my calendar tomorrow, and is anything in my inbox about it?",
         connected_if=_google_connected,
     ),
@@ -59,7 +59,7 @@ APPS: tuple[App, ...] = (
         ("slack",),
         ("SLACK_BOT_TOKEN",),
         "api.slack.com/apps → your app → OAuth & Permissions → Bot User OAuth Token (xoxb-…)",
-        verify="slack.users_list",
+        verify=("slack.users_list",),
         example="What did I miss on Slack today?",
     ),
     App(
@@ -68,7 +68,7 @@ APPS: tuple[App, ...] = (
         ("github",),
         ("GITHUB_TOKEN",),
         "github.com/settings/tokens, or press Enter to reuse the GitHub CLI's login",
-        verify="github.users_get_authenticated",
+        verify=("github.users_get_authenticated",),
         example="What needs my attention on GitHub today?",
     ),
     App(
@@ -77,7 +77,7 @@ APPS: tuple[App, ...] = (
         ("linear",),
         ("LINEAR_API_KEY",),
         "linear.app → Settings → Security & access → Personal API keys",
-        verify="linear.viewer",
+        verify=("linear.viewer",),
         example="What Linear issues are assigned to me and not started yet?",
     ),
     App(
@@ -87,7 +87,7 @@ APPS: tuple[App, ...] = (
         ("NOTION_API_KEY",),
         "notion.so/profile/integrations → New integration → Internal secret "
         "(then share the pages it may read with that integration)",
-        verify="notion.users_retrieve_me",
+        verify=("notion.users_retrieve_me",),
         example="Find my notes about the roadmap.",
     ),
     App(
@@ -96,7 +96,7 @@ APPS: tuple[App, ...] = (
         ("stripe",),
         ("STRIPE_API_KEY",),
         "dashboard.stripe.com/apikeys. A restricted key, or a test-mode key to start.",
-        verify="stripe.balance_retrieve",
+        verify=("stripe.balance_retrieve",),
         example="How much came in this week, and did any payment fail?",
     ),
     App(
@@ -105,7 +105,7 @@ APPS: tuple[App, ...] = (
         ("shopify",),
         ("SHOPIFY_SHOP", "SHOPIFY_ACCESS_TOKEN"),
         "Your store's admin → Apps → Develop apps → Admin API access token",
-        verify="shopify.shop_get",
+        verify=("shopify.shop_get",),
         example="How many orders came in today?",
     ),
     App(
@@ -114,7 +114,7 @@ APPS: tuple[App, ...] = (
         ("granola",),
         ("GRANOLA_API_KEY",),
         "Granola → Settings → API",
-        verify="granola.notes_list",
+        verify=("granola.notes_list",),
         example="What did we decide in my last meeting?",
     ),
     App(
@@ -123,7 +123,7 @@ APPS: tuple[App, ...] = (
         ("tavily",),
         ("TAVILY_API_KEY",),
         "app.tavily.com → API keys",
-        verify="tavily.usage",
+        verify=("tavily.usage",),
     ),
     App(
         "firecrawl",
@@ -131,7 +131,7 @@ APPS: tuple[App, ...] = (
         ("firecrawl",),
         ("FIRECRAWL_API_KEY",),
         "firecrawl.dev/app/api-keys",
-        verify="firecrawl.credit_usage",
+        verify=("firecrawl.credit_usage",),
     ),
 )
 

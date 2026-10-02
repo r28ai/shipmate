@@ -83,14 +83,14 @@ def model_host(model: Any) -> str:
     return known.get(type(model).__name__, type(model).__name__)
 
 
-def audit(call: ToolCall, host: str) -> None:
+def audit(call: ToolCall, host: str, pack: str | None) -> None:
     """Charter hands every finished call here: what was sent where, and how it went."""
-    log({"call": format_call_line(call), "host": host, **dataclasses.asdict(call)})
+    log({"call": format_call_line(call), "host": host, "pack": pack, **dataclasses.asdict(call)})
 
 
 def watch(tools: list[Tool]) -> list[Tool]:
     for t in tools:
-        t.on_call = lambda call, t=t: audit(call, host_of(t))
+        t.on_call = lambda call, t=t: audit(call, host_of(t), t.pack)
     return tools
 
 
@@ -236,6 +236,8 @@ def system_prompt(apps: list[App], routine: dict | None = None) -> str:
         "How you work:",
         "- App tools load on demand. Call ToolSearch with a few words "
         "('unread gmail threads', 'create calendar event') to load them, then call them.",
+        "- Your own tools (remember, forget, read_web_page, add_routine, list_routines, "
+        "remove_routine) are always loaded. Call them directly; ToolSearch only finds app tools.",
         "- Reading is free. Anything that sends, posts, creates, changes or deletes waits "
         "for the user's yes. If they say no, don't retry.",
         "- Only say you did something if a tool call did it. Shipmate shows the user a count "

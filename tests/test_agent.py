@@ -164,5 +164,21 @@ def test_hosts_lists_every_server_it_talked_to(tmp_path, capsys):
 
     main(["hosts"])
     out = capsys.readouterr().out
-    assert "gmail.googleapis.com" in out and "google" in out
+    assert "gmail.googleapis.com" in out and " gmail " in out  # named by pack, not "app"
     assert "GenericFakeChatModel" in out or "Scripted" in out  # the model's row
+
+
+def test_the_prompt_says_own_tools_need_no_search():
+    from shipmate.agent import OWN_TOOLS, system_prompt
+
+    prompt = system_prompt([])
+    assert all(t.name in prompt for t in OWN_TOOLS)
+
+
+def test_a_routine_report_is_titled_by_its_first_sentence(tmp_path):
+    from shipmate import routines
+    from shipmate.background import run_routine
+
+    r = routines.add("daily 08:00", "Weekday repo briefing: check r28ai/charter. Then summarize.")
+    path = asyncio.run(run_routine(r, Scripted(messages=iter([AIMessage("All quiet.")]))))
+    assert path.read_text().splitlines()[0] == "# Weekday repo briefing"

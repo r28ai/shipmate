@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "shipmate"
-version = "0.1.0"
+version = "0.1.1"
 description = "Your own personal agent, on your laptop. Gmail, Calendar, Slack, GitHub, Linear, Notion and more, with your keys and no middleman."
 readme = "README.md"
 license = { text = "Apache-2.0" }

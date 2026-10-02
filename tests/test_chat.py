@@ -27,3 +27,30 @@ def test_counts_what_ran_and_ignores_what_was_refused_or_local():
     assert tally([*turn, result("gmail_messages_send")], API, WRITES) == (
         "2 reads · changed: gmail_messages_send"
     )
+
+
+def test_running_out_of_input_at_the_gate_means_no(monkeypatch):
+    import asyncio
+
+    from shipmate import chat
+    from shipmate.apps import pack_tools
+
+    def no_more_input(prompt=""):
+        raise EOFError
+
+    monkeypatch.setattr(chat.console, "input", no_more_input)
+    target = next(t for t in pack_tools("gmail") if t.name == "messages_send")
+    assert asyncio.run(chat.ask("gmail_messages_send", target, {})) == "no"
+
+
+def test_a_wrong_answer_says_what_is_expected(monkeypatch, capsys):
+    import asyncio
+
+    from shipmate import chat
+    from shipmate.apps import pack_tools
+
+    answers = iter(["Remember that my repo is r28ai/charter.", "n"])
+    monkeypatch.setattr(chat.console, "input", lambda prompt="": next(answers))
+    target = next(t for t in pack_tools("gmail") if t.name == "messages_send")
+    assert asyncio.run(chat.ask("gmail_messages_send", target, {})) == "no"
+    assert "Answer y, n or a." in capsys.readouterr().out

@@ -50,9 +50,8 @@ async def run_routine(routine: dict, model: Any) -> Path:
         report = f"This run failed: {type(exc).__name__}: {exc}"
     slug = re.sub(r"[^a-z0-9]+", "-", routine["task"].lower())[:40].strip("-")
     path = inbox() / f"{started:%Y-%m-%d-%H%M}-{routine['id']}-{slug}.md"
-    path.write_text(
-        f"# {routine['task']}\n\n_{routine['when']} · {started:%a %d %b %H:%M}_\n\n{report}\n"
-    )
+    title = re.split(r"(?<=[.:!?])\s", routine["task"], maxsplit=1)[0][:80].rstrip(" .:")
+    path.write_text(f"# {title}\n\n_{routine['when']} · {started:%a %d %b %H:%M}_\n\n{report}\n")
     log({"routine": routine["id"], "report": str(path)})
     first_line = next((line for line in report.splitlines() if line.strip()), "")
     notify(f"Shipmate · routine #{routine['id']}", first_line.lstrip("#* "))

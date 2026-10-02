@@ -15,7 +15,6 @@ import argparse
 import asyncio
 import getpass
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -54,32 +53,47 @@ def status_table() -> None:
     for app in APPS:
         mark = "[green]●[/]" if app.is_connected() else "[dim]○[/]"
         console.print(f" {mark} [bold]{app.key:<10}[/] {app.label}")
-    for key, (env, _) in MODELS.items():
-        mark = "[green]●[/]" if os.environ.get(env) else "[dim]○[/]"
-        console.print(f" {mark} [bold]{key:<10}[/] model key")
+    from shipmate.agent import model_name
+
+    name = model_name()
+    mark = "[green]●[/]" if name else "[dim]○[/]"
+    what = name or f"none yet: shipmate connect {' or '.join(MODELS)}"
+    console.print(f" {mark} [bold]{'model':<10}[/] {escape(what)}")
     console.print("\n[dim]shipmate connect <name> to add one.[/]")
 
 
 async def verify(app_key: str) -> None:
-    """Make one cheap read with the new key, so a typo shows up now, not mid-task."""
-    from charter import CharterError, ToolValidationError
+    """Make one cheap read per service with the new key, so a gap shows up now, not mid-task."""
+    from charter import APIError, CharterError, ToolValidationError
 
     from shipmate.apps import find, pack_tools
 
     app = find(app_key)
-    if app is None or app.verify is None:
+    if app is None or not app.verify:
         return
-    pack, name = app.verify.split(".")
-    tool = next(t for t in pack_tools(pack) if t.name == name)
-    try:
-        await tool.ainvoke({})
-    except ToolValidationError:
-        console.print("[dim]Saved (no quick check available for this app).[/]")
-    except CharterError as exc:
-        console.print(f"[red]Saved, but the check failed:[/] {exc}", markup=False)
-        raise SystemExit(1) from None
-    else:
+    passed, failed = [], []
+    for check in app.verify:
+        pack, name = check.split(".")
+        tool = next(t for t in pack_tools(pack) if t.name == name)
+        try:
+            await tool.ainvoke({})
+        except ToolValidationError:
+            continue  # this check needs arguments; nothing learned
+        except APIError as exc:
+            failed.append((pack, f"HTTP {exc.status_code}: {exc.message}"[:160]))
+        except CharterError as exc:
+            failed.append((pack, str(exc).splitlines()[0][:160]))
+        else:
+            passed.append(pack)
+    if not failed:
         console.print(f"[green]✓ {app.label} connected.[/]")
+        return
+    if passed:
+        console.print(f"[green]✓ {', '.join(passed)}[/]")
+    for pack, reason in failed:
+        console.print(f"✗ {pack}: {reason}", style="red", markup=False)
+    console.print(f"[dim]Saved anyway. Run `shipmate connect {app.key}` again to fix it.[/]")
+    raise SystemExit(1)
 
 
 def github_cli_token() -> str | None:
@@ -262,7 +276,7 @@ def cmd_hosts(args: argparse.Namespace) -> None:
         elif "web" in e:
             row = (e["web"], "web page")
         elif "host" in e:
-            row = (e["host"], e.get("provider") or "app")
+            row = (e["host"], e.get("pack") or e.get("provider") or "app")
         else:
             continue
         counts[row] = counts.get(row, 0) + 1

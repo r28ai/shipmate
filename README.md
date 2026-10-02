@@ -66,14 +66,20 @@ $ uv tool install git+https://github.com/r28ai/shipmate@v0.1.1
 $ shipmate
 Shipmate runs on your computer, with your own keys.
 
-Model  1 Anthropic (Claude)   2 OpenAI
-› 1
+Model
+  1 Anthropic (Claude)
+  2 OpenAI
+  3 Fireworks (open models)
+  4 OpenRouter (hundreds of models, one key)
+  5 Together (open models)
+  6 Ollama (on this computer, no key)
+› (Enter for 1) 1
 ANTHROPIC_API_KEY: ••••
-✓ saved ANTHROPIC_API_KEY
+✓ Shipmate will use anthropic:claude-sonnet-5
 
 First app  GitHub takes ten seconds: it reuses your `gh` login.
 ›
-GITHUB_TOKEN (Enter to use your gh login):
+GITHUB_TOKEN (Enter to use your gh login): ••••
 ✓ GitHub connected.
 ```
 

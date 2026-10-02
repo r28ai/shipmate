@@ -38,7 +38,7 @@ def need_model(explicit: str | None) -> tuple[object, str]:
     if name is None:
         console.print(
             "No model key yet. Run [bold]shipmate connect anthropic[/] (or openai), "
-            "or pass [bold]--model[/] (e.g. ollama:qwen3 with `pip install 'shipmate\\[ollama]'`)."
+            "or pass [bold]--model[/] with any LangChain provider, e.g. fireworks:… or ollama:…"
         )
         raise SystemExit(1)
     try:

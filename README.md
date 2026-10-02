@@ -7,10 +7,13 @@
 Your keys, your machine, nobody in between. It reads your email, calendar, GitHub, Slack and Linear,<br>
 and asks before it changes anything, even when you tell it not to.
 
+<sub>Shipmate is the showcase app for <a href="https://github.com/r28ai/charter">Charter</a>, the library its 550 tools come from.
+It's maintained as an example, not a product with a roadmap.</sub>
+
 </div>
 
 ```console
-$ uvx shipmate
+$ shipmate
 › What changed in the latest release of r28ai/charter, and is anything open on it?
   ⌕ loading github_releases_get_latest, github_issues_list_for_repo, github_pulls_list, github_repos_get
   ↳ github_releases_get_latest(owner="r28ai", repo="charter")
@@ -59,7 +62,8 @@ titled "Shipmate test" (no body) on r28ai/charter.
 ## Try it in 60 seconds
 
 ```console
-$ uvx shipmate
+$ uv tool install git+https://github.com/r28ai/shipmate@v0.1.0
+$ shipmate
 Shipmate runs on your computer, with your own keys.
 
 Model  1 Anthropic (Claude)   2 OpenAI
@@ -74,6 +78,24 @@ GITHUB_TOKEN (Enter to use your gh login):
 ```
 
 Then ask it what needs your attention on GitHub today. Gmail and Calendar take five more minutes, [once](#connect-your-apps).
+
+No `uv`? `pip install git+https://github.com/r28ai/shipmate@v0.1.0` works too.
+
+## Want these tools in your own agent?
+
+Shipmate is a thin app. The tools are [Charter](https://github.com/r28ai/charter): 550 of them across Gmail, Calendar, Drive, Sheets, Slack, GitHub, Linear, Notion, Stripe and more, each declared as a schema, with no SDKs and no server in between. The same setup Shipmate uses, in your own LangChain agent:
+
+```python
+from charter import ToolSession
+from charter.adapters.langchain import CharterMiddleware
+from charter.packs import github, gmail
+from langchain.agents import create_agent
+
+session = ToolSession([*gmail.TOOLS, *github.TOOLS])  # schemas load only when the model asks
+agent = create_agent("anthropic:claude-sonnet-5", tools=[], middleware=[CharterMiddleware(session)])
+```
+
+Or in Claude Code, Cursor, or any MCP client: `uvx --from 'charter-ai[mcp]' charter-mcp --pack gmail,github`.
 
 ## Why another one
 
@@ -160,8 +182,8 @@ Anthropic or OpenAI out of the box: Claude Sonnet 5 when `ANTHROPIC_API_KEY` is 
 
 ```console
 $ shipmate --model anthropic:claude-opus-5-5
-$ uvx --from 'shipmate[fireworks]' shipmate --model fireworks:accounts/fireworks/models/kimi-k3
-$ uvx --from 'shipmate[ollama]' shipmate --model ollama:qwen3
+$ uv tool install git+https://github.com/r28ai/shipmate@v0.1.0 --with langchain-fireworks
+$ shipmate --model fireworks:accounts/fireworks/models/kimi-k3
 ```
 
 ## How it's built

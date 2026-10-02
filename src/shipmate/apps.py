@@ -68,7 +68,7 @@ APPS: tuple[App, ...] = (
         ("github",),
         ("GITHUB_TOKEN",),
         "github.com/settings/tokens, or press Enter to reuse the GitHub CLI's login",
-        verify=("github.users_get_authenticated",),
+        verify=("github.users_get_authenticated", "github.notifications_list"),
         example="What needs my attention on GitHub today?",
     ),
     App(

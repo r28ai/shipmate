@@ -6,7 +6,7 @@ import os
 import stat
 import threading
 import urllib.request
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import respx
 
@@ -56,3 +56,68 @@ def test_connect_writes_a_private_grant_and_points_charter_at_it(tmp_path, monke
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert os.environ["GOOGLE_TOKEN_FILE"] == str(path)
     assert f"GOOGLE_TOKEN_FILE={path}" in (tmp_path / "secrets.env").read_text()
+
+
+def free_port() -> int:
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def test_a_web_client_signs_in_at_its_registered_address(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIPMATE_HOME", str(tmp_path))
+    monkeypatch.delenv("GOOGLE_TOKEN_FILE", raising=False)
+    registered = f"http://localhost:{free_port()}/auth/provider/callback"
+    client = tmp_path / "web_client.json"
+    client.write_text(
+        json.dumps(
+            {
+                "web": {
+                    "client_id": "cid",
+                    "client_secret": "csecret",
+                    "redirect_uris": ["https://example.com/callback", registered],
+                }
+            }
+        )
+    )
+    seen: dict = {}
+
+    def browser(url: str) -> bool:
+        query = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
+        seen.update(query)
+        back = f"{query['redirect_uri']}?code=the-code&state={query['state']}"
+        threading.Thread(target=lambda: urllib.request.urlopen(back).read()).start()
+        return True
+
+    monkeypatch.setattr(google.webbrowser, "open", browser)
+
+    class Console:
+        def print(self, *args, **kwargs):
+            pass
+
+        def input(self, prompt=""):
+            return str(client)
+
+    with respx.mock:
+        token = respx.post("https://oauth2.googleapis.com/token").respond(
+            json={"access_token": "at", "refresh_token": "rt", "expires_in": 3600}
+        )
+        asyncio.run(google.connect(Console()))
+
+    assert seen["redirect_uri"] == registered
+    assert f"redirect_uri={quote(registered, safe='')}".encode() in token.calls.last.request.content
+
+
+def test_a_web_client_without_a_localhost_address_says_what_to_add(tmp_path):
+    import pytest
+
+    client = tmp_path / "web_client.json"
+    client.write_text(
+        json.dumps(
+            {"web": {"client_id": "c", "client_secret": "s", "redirect_uris": ["https://x.dev/cb"]}}
+        )
+    )
+    with pytest.raises(SystemExit, match="Authorized redirect URIs"):
+        google.read_client(client)

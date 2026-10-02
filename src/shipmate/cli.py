@@ -62,6 +62,12 @@ def status_table() -> None:
     console.print(f"\n[dim]shipmate connect <app>, or a model provider: {providers}.[/]")
 
 
+HINTS = {
+    "notifications_list": "Fine-grained GitHub tokens can't read notifications at all. Run "
+    "`shipmate connect github` and press Enter to use your gh login, or use a classic token.",
+}
+
+
 async def verify(app_key: str) -> None:
     """Make one cheap read per service with the new key, so a gap shows up now, not mid-task."""
     from charter import APIError, CharterError, ToolValidationError
@@ -71,27 +77,31 @@ async def verify(app_key: str) -> None:
     app = find(app_key)
     if app is None or not app.verify:
         return
+    one_service = len({check.split(".")[0] for check in app.verify}) == 1
     passed, failed = [], []
     for check in app.verify:
         pack, name = check.split(".")
+        what = name if one_service and len(app.verify) > 1 else pack
         tool = next(t for t in pack_tools(pack) if t.name == name)
         try:
             await tool.ainvoke({})
         except ToolValidationError:
             continue  # this check needs arguments; nothing learned
         except APIError as exc:
-            failed.append((pack, f"HTTP {exc.status_code}: {exc.message}"[:160]))
+            failed.append((what, f"HTTP {exc.status_code}: {exc.message}"[:160]))
         except CharterError as exc:
-            failed.append((pack, str(exc).splitlines()[0][:160]))
+            failed.append((what, str(exc).splitlines()[0][:160]))
         else:
-            passed.append(pack)
+            passed.append(what)
     if not failed:
         console.print(f"[green]✓ {app.label} connected.[/]")
         return
     if passed:
         console.print(f"[green]✓ {', '.join(passed)}[/]")
-    for pack, reason in failed:
-        console.print(f"✗ {pack}: {reason}", style="red", markup=False)
+    for what, reason in failed:
+        console.print(f"✗ {what}: {reason}", style="red", markup=False)
+        if what in HINTS:
+            console.print(f"  [dim]{HINTS[what]}[/]")
     console.print(f"[dim]Saved anyway. Run `shipmate connect {app.key}` again to fix it.[/]")
     raise SystemExit(1)
 

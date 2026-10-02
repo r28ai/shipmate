@@ -54,10 +54,31 @@ SETUP = f"""\
 """
 
 
-def read_client(path: Path) -> tuple[str, str]:
+def read_client(path: Path) -> tuple[str, str, str | None]:
+    """The client's id and secret, and the redirect address Google will accept.
+
+    A Desktop client accepts any port on this machine, so that address is None
+    and a free port is picked. A Web client only accepts the addresses
+    registered for it, so one on localhost has to be used exactly.
+    """
     data = json.loads(path.expanduser().read_text())
     client = data.get("installed") or data.get("web") or data
-    return client["client_id"], client["client_secret"]
+    redirect = None
+    if "web" in data:
+        local = [
+            uri
+            for uri in client.get("redirect_uris", [])
+            if urlparse(uri).scheme == "http"
+            and urlparse(uri).hostname in ("localhost", "127.0.0.1")
+        ]
+        if not local:
+            raise SystemExit(
+                "This is a Web client with no localhost redirect address. Add "
+                "http://127.0.0.1:8765/ to its Authorized redirect URIs, "
+                "or create a Desktop app client."
+            )
+        redirect = local[0]
+    return client["client_id"], client["client_secret"], redirect
 
 
 def wait_for_redirect(server: HTTPServer) -> dict[str, str]:
@@ -91,15 +112,18 @@ def wait_for_redirect(server: HTTPServer) -> dict[str, str]:
 async def connect(console: Console) -> Path:
     console.print(SETUP)
     raw = console.input("Path to the downloaded client JSON: ").strip().strip("'\"")
-    client_id, client_secret = read_client(Path(raw))
+    client_id, client_secret, redirect = read_client(Path(raw))
 
-    server = HTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
-    port = server.server_address[1]
+    if redirect:
+        where = urlparse(redirect)
+        server = HTTPServer(
+            (where.hostname or "localhost", where.port or 80), BaseHTTPRequestHandler
+        )
+    else:
+        server = HTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
+        redirect = f"http://127.0.0.1:{server.server_address[1]}/"
     flow = OAuth2Flow(
-        GOOGLE,
-        client_id=client_id,
-        client_secret=client_secret,
-        redirect_uri=f"http://127.0.0.1:{port}/",
+        GOOGLE, client_id=client_id, client_secret=client_secret, redirect_uri=redirect
     )
     scopes = scopes_for(t for pack in GOOGLE_PACKS for t in pack_tools(pack))
     request = flow.authorize(scopes)

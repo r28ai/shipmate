@@ -33,3 +33,17 @@ def test_the_status_names_the_model_in_use(monkeypatch, capsys):
     monkeypatch.setenv("SHIPMATE_MODEL", "fireworks:accounts/fireworks/models/glm-5p3-flash")
     status_table()
     assert "glm-5p3-flash" in capsys.readouterr().out
+
+
+@respx.mock
+def test_a_fine_grained_github_token_is_told_why_notifications_fail(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_TOKEN", "github_pat_test")
+    respx.get("https://api.github.com/user").respond(json={"login": "someone"})
+    respx.get(url__regex=r"https://api.github.com/notifications.*").respond(
+        403, json={"message": "Resource not accessible by personal access token"}
+    )
+    with pytest.raises(SystemExit):
+        asyncio.run(verify("github"))
+    out = capsys.readouterr().out
+    assert "✓ users_get_authenticated" in out
+    assert "✗ notifications_list: HTTP 403" in out and "gh login" in out

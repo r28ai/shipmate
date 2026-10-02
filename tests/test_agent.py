@@ -100,8 +100,9 @@ def test_no_means_nothing_is_sent(tmp_path):
     assert not route.called
     refusal = next(m for m in messages if isinstance(m, ToolMessage) and m.tool_call_id == "send-1")
     assert refusal.status == "error" and "said no" in refusal.text
-    decisions = [json.loads(line) for line in (tmp_path / "log.jsonl").read_text().splitlines()]
-    assert {"decision": "no", "tool": "gmail_messages_send"}.items() <= decisions[-1].items()
+    entries = [json.loads(line) for line in (tmp_path / "log.jsonl").read_text().splitlines()]
+    decisions = [e for e in entries if "decision" in e]
+    assert [(d["decision"], d["tool"]) for d in decisions] == [("no", "gmail_messages_send")]
 
 
 @respx.mock
@@ -151,3 +152,17 @@ def test_google_counts_as_connected_with_any_grant_shape(monkeypatch):
             if name != "GOOGLE_TOKEN_FILE":
                 monkeypatch.delenv(name, raising=False)
     assert [app.key for app in connected()] == ["google"]
+
+
+@respx.mock
+def test_hosts_lists_every_server_it_talked_to(tmp_path, capsys):
+    from shipmate.cli import main
+
+    respx.post(f"{GMAIL}/messages/send").respond(json={"id": "m1"})
+    ask, _ = answer("yes")
+    run(script(search("send an email"), SEND), ask)
+
+    main(["hosts"])
+    out = capsys.readouterr().out
+    assert "gmail.googleapis.com" in out and "google" in out
+    assert "GenericFakeChatModel" in out or "Scripted" in out  # the model's row

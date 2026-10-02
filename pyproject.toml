@@ -20,6 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ollama = ["langchain-ollama>=1.0"]
+fireworks = ["langchain-fireworks>=1.0"]
 
 [project.scripts]
 shipmate = "shipmate.cli:main"

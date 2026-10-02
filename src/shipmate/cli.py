@@ -21,6 +21,7 @@ import subprocess
 import sys
 
 from rich.console import Console
+from rich.markup import escape
 
 from shipmate.home import home, load_secrets, save_secret
 
@@ -92,24 +93,35 @@ def github_cli_token() -> str | None:
 
 
 def cmd_chat(args: argparse.Namespace) -> None:
+    from shipmate.agent import model_name
     from shipmate.chat import chat
 
+    no_model = model_name(args.model) is None
+    first_time = not (home() / ".welcomed").exists()
+    if sys.stdin.isatty() and (no_model or first_time):
+        welcome(need_model_key=no_model)
     model, name = need_model(args.model)
     asyncio.run(chat(model, name))
 
 
 def cmd_connect(args: argparse.Namespace) -> None:
+    if args.app:
+        connect(args.app)
+    else:
+        status_table()
+
+
+def connect(key: str) -> None:
     from shipmate.apps import MODELS, find
 
-    if not args.app:
-        status_table()
-        return
-    key = args.app.lower()
-
+    key = key.lower()
     if key in MODELS:
         env, how = MODELS[key]
         console.print(f"[dim]{how}[/]")
-        save_secret(env, getpass.getpass(f"{env}: ").strip())
+        value = getpass.getpass(f"{env}: ").strip()
+        if not value:
+            raise SystemExit(f"Nothing entered for {env}.")
+        save_secret(env, value)
         console.print(f"[green]✓ saved {env}[/]")
         return
 
@@ -127,8 +139,8 @@ def cmd_connect(args: argparse.Namespace) -> None:
     else:
         console.print(f"[dim]{app.how}[/]")
         for env in app.env:
-            if env == "GITHUB_TOKEN":
-                value = getpass.getpass(f"{env} (Enter to use `gh auth token`): ").strip()
+            if env == "GITHUB_TOKEN" and github_cli_token():
+                value = getpass.getpass(f"{env} (Enter to use your gh login): ").strip()
                 value = value or github_cli_token() or ""
             elif env == "SHOPIFY_SHOP":
                 value = input(f"{env} (your-store.myshopify.com): ").strip()
@@ -138,6 +150,31 @@ def cmd_connect(args: argparse.Namespace) -> None:
                 raise SystemExit(f"Nothing entered for {env}.")
             save_secret(env, value)
     asyncio.run(verify(app.key))
+
+
+def welcome(need_model_key: bool) -> None:
+    """From nothing to a working chat in about a minute."""
+    from shipmate.apps import connected
+
+    (home() / ".welcomed").touch()
+    console.print("[bold]Shipmate[/] runs on your computer, with your own keys.\n")
+    if need_model_key:
+        console.print("[bold]Model[/]  [bold]1[/] Anthropic (Claude)   [bold]2[/] OpenAI")
+        connect("openai" if console.input("› ").strip() == "2" else "anthropic")
+    if connected():
+        return
+    console.print(
+        "\n[bold]First app[/]  GitHub takes ten seconds: it reuses your `gh` login.\n"
+        "[dim]Enter for GitHub, or type google, slack, linear, notion… or skip[/]"
+    )
+    key = console.input("› ").strip().lower() or "github"
+    if key != "skip":
+        try:
+            connect(key)
+        except SystemExit as exc:  # a failed app shouldn't stop you from chatting
+            if isinstance(exc.code, str):
+                console.print(exc.code, style="dim", markup=False)
+    console.print()
 
 
 def cmd_routines(args: argparse.Namespace) -> None:
@@ -197,19 +234,50 @@ def cmd_inbox(args: argparse.Namespace) -> None:
 
 def cmd_log(args: argparse.Namespace) -> None:
     path = home() / "log.jsonl"
-    lines = path.read_text().splitlines()[-args.n :] if path.exists() else []
-    for line in lines:
-        entry = json.loads(line)
+    lines = path.read_text().splitlines() if path.exists() else []
+    entries = [json.loads(line) for line in lines]
+    shown = [e for e in entries if {"call", "decision", "routine"} & e.keys()][-args.n :]
+    for entry in shown:
+        at = f"[dim]{entry['at']}[/]"
         if "call" in entry:
-            console.print(f"[dim]{entry['at']}[/]  {entry['call']}", highlight=False)
+            console.print(f"{at}  {escape(entry['call'])}", highlight=False)
         elif "decision" in entry:
-            console.print(
-                f"[dim]{entry['at']}[/]  [yellow]you said {entry['decision']}[/] to {entry['tool']}"
-            )
-        elif "routine" in entry:
-            console.print(f"[dim]{entry['at']}[/]  routine #{entry['routine']} → {entry['report']}")
-    if not lines:
+            console.print(f"{at}  [yellow]you said {entry['decision']}[/] to {entry['tool']}")
+        else:
+            console.print(f"{at}  routine #{entry['routine']} → {escape(entry['report'])}")
+    if not shown:
         console.print("No calls yet.")
+
+
+def cmd_hosts(args: argparse.Namespace) -> None:
+    """Every server Shipmate has sent a request to, counted from the log."""
+    from shipmate.apps import find
+
+    path = home() / "log.jsonl"
+    entries = [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+    counts: dict[tuple[str, str], int] = {}
+    for e in entries:
+        if "model" in e:
+            row = (e["model"], "model")
+        elif "web" in e:
+            row = (e["web"], "web page")
+        elif "host" in e:
+            row = (e["host"], e.get("provider") or "app")
+        else:
+            continue
+        counts[row] = counts.get(row, 0) + 1
+    if not counts:
+        console.print("Nothing yet. Every request Shipmate makes will be counted here.")
+        return
+    console.print(f"Every server Shipmate has talked to since {entries[0]['at'][:10]}:\n")
+    for (host, kind), n in sorted(counts.items(), key=lambda item: -item[1]):
+        console.print(f"  [bold]{host:<28}[/] {kind:<10} {n:>5}", highlight=False)
+    google = find("google")
+    if google and google.is_connected():
+        console.print(
+            "\n[dim]Not logged: oauth2.googleapis.com, where your Google sign-in renews.[/]"
+        )
+    console.print("[dim]Shipmate has no server of its own.[/]")
 
 
 def cmd_egress(args: argparse.Namespace) -> None:
@@ -250,6 +318,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("run", parents=[with_model], help="run routines in the background")
     p = sub.add_parser("inbox", help="what routines reported")
     p.add_argument("-n", type=int, default=3)
+    sub.add_parser("hosts", help="every server it has talked to")
     p = sub.add_parser("log", help="every API request it made")
     p.add_argument("-n", type=int, default=40)
     p = sub.add_parser("egress", help="which fields the model can see, per tool")
@@ -264,6 +333,7 @@ def main(argv: list[str] | None = None) -> None:
         "run": cmd_run,
         "inbox": cmd_inbox,
         "log": cmd_log,
+        "hosts": cmd_hosts,
         "egress": cmd_egress,
     }
     try:

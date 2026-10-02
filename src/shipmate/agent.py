@@ -16,6 +16,7 @@ import os
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from charter import Tool, ToolCall, ToolSession, format_call_line, html_to_text
@@ -64,15 +65,41 @@ def log(entry: dict) -> None:
         pass
 
 
-def audit(call: ToolCall) -> None:
+def host_of(tool: Tool) -> str:
+    base = tool.base_url
+    try:
+        base = base() if callable(base) else base  # a Shopify store's URL is per-store
+    except Exception:
+        return tool.pack or "unknown"
+    return urlparse(str(base)).netloc
+
+
+def model_host(model: Any) -> str:
+    for attr in ("anthropic_api_url", "openai_api_base", "base_url", "fireworks_api_base"):
+        value = getattr(model, attr, None)
+        if isinstance(value, str) and value:
+            return urlparse(value).netloc or value
+    known = {"ChatOpenAI": "api.openai.com", "ChatFireworks": "api.fireworks.ai"}
+    return known.get(type(model).__name__, type(model).__name__)
+
+
+def audit(call: ToolCall, host: str) -> None:
     """Charter hands every finished call here: what was sent where, and how it went."""
-    log({"call": format_call_line(call), **dataclasses.asdict(call)})
+    log({"call": format_call_line(call), "host": host, **dataclasses.asdict(call)})
 
 
 def watch(tools: list[Tool]) -> list[Tool]:
     for t in tools:
-        t.on_call = audit
+        t.on_call = lambda call, t=t: audit(call, host_of(t))
     return tools
+
+
+class Ledger(AgentMiddleware):
+    """Logs each model call's destination, so `shipmate hosts` can list it."""
+
+    async def awrap_model_call(self, request: Any, handler: Any) -> Any:
+        log({"model": model_host(request.model)})
+        return await handler(request)
 
 
 # ----------------------------------------------------------------- the gate
@@ -152,6 +179,7 @@ async def read_web_page(url: str) -> str:
     """Fetch a web page and return its text. For reading a link, not for searching."""
     if not url.startswith(("http://", "https://")):
         return "Only http and https links can be read."
+    log({"web": urlparse(url).netloc})
     async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
         response = await client.get(url, headers={"user-agent": "shipmate/0.1"})
     text = response.text
@@ -210,7 +238,11 @@ def system_prompt(apps: list[App], routine: dict | None = None) -> str:
         "('unread gmail threads', 'create calendar event') to load them, then call them.",
         "- Reading is free. Anything that sends, posts, creates, changes or deletes waits "
         "for the user's yes. If they say no, don't retry.",
+        "- Only say you did something if a tool call did it. Shipmate shows the user a count "
+        "of what actually ran after every reply, so a claim with no call behind it is caught.",
         "- Do the work instead of describing it. Ask only when the choice is the user's.",
+        "- Never guess an email address, ID or date. Look it up (for the user's own address, "
+        "their Gmail profile).",
         "- Lead with the answer. Keep it short. Name people, dates and amounts exactly.",
         "- When the user tells you something lasting about themselves, call remember.",
         "- When they want something done on a schedule, call add_routine.",
@@ -246,5 +278,5 @@ def build_agent(
     return create_agent(
         model,
         tools=OWN_TOOLS,
-        middleware=[prompt, Gate(session, ask, allow), CharterMiddleware(session)],
+        middleware=[prompt, Ledger(), Gate(session, ask, allow), CharterMiddleware(session)],
     )

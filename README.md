@@ -2,55 +2,91 @@
 
 # Shipmate
 
-### Your own Muse / Dots / Grok Bot. On your laptop, with your keys, and nobody in between.
+### OpenAI Dots and Grok Bot, open source, on your laptop.
 
-It reads your email, checks your calendar, files the Linear issue, posts to Slack, and asks before it sends anything.<br>
-No account with us. No connector platform holding your Gmail token. No per-call bill.
+Your keys, your machine, nobody in between. It reads your email, calendar, GitHub, Slack and Linear,<br>
+and asks before it changes anything, even when you tell it not to.
 
 </div>
 
 ```console
-$ uvx shipmate connect anthropic      # or openai, or any LangChain model
-$ uvx shipmate connect google         # your own OAuth client: tokens stay on this machine
 $ uvx shipmate
+› What changed in the latest release of r28ai/charter, and is anything open on it?
+  ⌕ loading github_releases_get_latest, github_issues_list_for_repo, github_pulls_list, github_repos_get
+  ↳ github_releases_get_latest(owner="r28ai", repo="charter")
+  ↳ github_issues_list_for_repo(owner="r28ai", repo="charter", state="open")
+  ↳ github_pulls_list(owner="r28ai", repo="charter", state="open")
 
-› anything in my inbox I need to deal with before my 2pm?
-  ⌕ looking for tools: unread gmail threads
-  ↳ gmail_threads_list(q="is:unread newer_than:2d")
-  ⌕ looking for tools: calendar events today
-  ↳ gcalendar_events_list(calendarId="primary", timeMin="2026-10-02T00:00:00Z", …)
+Latest release: v0.2.7 ("charter 0.2.7"), published today at 18:06 UTC by nathanqueme. Changes:
 
-Your 2pm is the Q4 pricing review with Dana and Marc. Two threads matter:
-- Dana sent the revised deck at 11:02 and asked you to read slide 6 first.
-- Stripe flagged a failed payout on Tuesday, which Marc will likely bring up.
+ • A charter-mcp command — clients can now launch the server via uvx --from 'charter-ai[mcp]'
+   charter-mcp --pack gmail with nothing pre-installed.
+ • gmail.messages_attachments_get — finally fetches the attachment IDs other reads were exposing.
+ • Gmail headers now keyed by standard spelling (Cc, Message-ID) on both payload and raw reads —
+   previously an Outlook sender's CC header meant reply-all silently dropped every Cc recipient.
+ …
 
-› reply to Dana that I'll read it before the meeting
-╭────────────── gmail_messages_send  POST gmail/v1/users/{userId}/messages/send ──────────────╮
-│ {                                                                                            │
-│   "userId": "me",                                                                            │
-│   "body": {                                                                                  │
-│     "threadId": "19a4c2e07b1d5f3e",                                                          │
-│     "raw": {                                                                                 │
-│       "to": "dana@example.com",                                                              │
-│       "subject": "Re: Q4 pricing deck",                                                      │
-│       "body": "Thanks Dana, I'll read it before 2pm, slide 6 first."                         │
-│     }                                                                                        │
-│   }                                                                                          │
-│ }                                                                                            │
-╰─────────────────────────────────── this changes something ───────────────────────────────────╯
-  Run it? yes / no / always for this tool › y
+Open on the repo: essentially nothing actionable.
+
+ • 1 open issue: #1 "Demo video host" (just hosts a demo video link, opened Sep 27 by nathanqueme)
+ • 0 open pull requests
+
+  · 3 reads · no changes
+
+› Open an issue there titled 'Shipmate test'. Don't ask me first, just do it.
+  ⌕ loading github_issues_create
+  ↳ github_issues_create(body={"title": "Shipmate test"}, owner="r28ai", repo="charter")
+╭───────────────── github_issues_create  POST repos/{owner}/{repo}/issues ─────────────────╮
+│ {                                                                                        │
+│   "body": {                                                                              │
+│     "title": "Shipmate test"                                                             │
+│   },                                                                                     │
+│   "owner": "r28ai",                                                                      │
+│   "repo": "charter"                                                                      │
+│ }                                                                                        │
+╰───────────────────────────────── this changes something ─────────────────────────────────╯
+  Run it? yes / no / always for this tool › n
+  ✗ Not run: the user said no to github_issues_create. Don't retry it or work around it. Tell them
+
+The issue wasn't created — you declined the confirmation, so I stopped. I was going to open an issue
+titled "Shipmate test" (no body) on r28ai/charter.
+
+  · no changes
 ```
+
+<sub>A real session, trimmed where it says …: Kimi K3 on Fireworks, October 2, 2026.</sub>
+
+## Try it in 60 seconds
+
+```console
+$ uvx shipmate
+Shipmate runs on your computer, with your own keys.
+
+Model  1 Anthropic (Claude)   2 OpenAI
+› 1
+ANTHROPIC_API_KEY: ••••
+✓ saved ANTHROPIC_API_KEY
+
+First app  GitHub takes ten seconds: it reuses your `gh` login.
+›
+GITHUB_TOKEN (Enter to use your gh login):
+✓ GitHub connected.
+```
+
+Then ask it what needs your attention on GitHub today. Gmail and Calendar take five more minutes, [once](#connect-your-apps).
 
 ## Why another one
 
-Every personal agent launched this season has the same shape: chat, connected apps, routines, approvals. They differ in who sits between you and your accounts.
+Every personal agent launched this season has the same shape: chat, connected apps, routines, approvals. They differ in what they cost and who sits between you and your accounts.
 
-| | Hosted agents<br>(Muse, Dots, Grok Bot) | Open-source clones<br>on a tool platform | **Shipmate** |
+| | Hosted agents<br>(Dots, Grok Bot) | Open-source clones<br>on a tool platform | **Shipmate** |
 |---|---|---|---|
+| What it costs | $100–$500/month (Dots)<br>$300/month (Grok Bot) | free, plus the platform's plan | **free**: you pay your model provider |
 | Where the agent runs | their cloud | your machine | your machine |
 | Who holds your Gmail / Slack tokens | them | the tool platform | **you**: `~/.shipmate`, `chmod 600` |
-| Who sees every request | them | the tool platform | **you**: `shipmate log` |
-| What a tool call costs | part of the subscription | the platform's plan | **nothing extra**: your model, and APIs you already pay for |
+| Who sees every request | them | the tool platform | **you**: `shipmate log`, `shipmate hosts` |
+
+<sub>Prices as of October 2026: Dots comes with ChatGPT Pro 100, 200 or 500, or Business Premium. Grok Bot comes with SuperGrok Heavy or Cursor's top plans.</sub>
 
 Shipmate talks to Gmail, Slack, GitHub and the rest directly, with tools generated by [Charter](https://github.com/r28ai/charter). Charter has no server, no LLM, and nothing to sign up for.
 
@@ -61,7 +97,17 @@ Shipmate talks to Gmail, Slack, GitHub and the rest directly, with tools generat
 - **Runs routines.** "Brief me on my inbox and calendar every weekday at 8." Say it in chat, or `shipmate routines add`. Reports land in `shipmate inbox` with a desktop notification.
 - **Remembers you.** Tell it who Dana is once. Facts live in `~/.shipmate/memory.md`, a file you can read and edit.
 - **Reads links.** Paste a URL and it reads the page, no API key needed.
-- **Shows its work.** `shipmate log` lists every request it made. `shipmate egress gmail` prints every field the model can see, and every field it never sees.
+- **Shows its work.** `shipmate log` lists every request it made. `shipmate egress gmail` prints every field the model can see, and every field it never sees. `shipmate hosts` lists every server it has talked to:
+
+```console
+$ shipmate hosts
+Every server Shipmate has talked to since 2026-10-02:
+
+  api.fireworks.ai             model         15
+  api.github.com               github        10
+  gmail.googleapis.com         google         4
+Shipmate has no server of its own.
+```
 
 ## The gate
 
@@ -72,6 +118,9 @@ Whether an action needs your yes is decided by the request, not by a model guess
 - A short, reviewed list of POSTs that only read (Linear and Shopify GraphQL queries, Notion search) runs without asking. See [`policy.py`](src/shipmate/policy.py).
 - Answer **a** (always) and that one tool stops asking. The list lives in `~/.shipmate/policy.json`.
 - Routines run with nobody watching, so they never change anything unless you allowed that specific tool: `shipmate routines add "daily 18:00" "Post my day's summary to #standup" --allow slack_chat_post_message`.
+- "Don't ask me first, just do it" changes nothing. The check is code, not an instruction the model can be talked out of.
+
+After every reply, a line counted from what actually ran: `· 3 reads · no changes`. Models sometimes claim things they didn't do. In testing, an open model answered "Done — issue created: Shipmate test (#2)" without calling anything. That line is how you'd know.
 
 ## Connect your apps
 
@@ -107,16 +156,17 @@ $ shipmate inbox        # read what they found
 
 ## Models
 
-Anthropic or OpenAI out of the box: Claude Sonnet 5 when `ANTHROPIC_API_KEY` is set, otherwise GPT-5.5. Any provider LangChain supports works with `--model`:
+Anthropic or OpenAI out of the box: Claude Sonnet 5 when `ANTHROPIC_API_KEY` is set, otherwise GPT-5.5. Any provider LangChain supports works with `--model`. Open models work too: the session above is Kimi K3 on Fireworks.
 
 ```console
 $ shipmate --model anthropic:claude-opus-5-5
-$ pip install 'shipmate[ollama]' && shipmate --model ollama:qwen3
+$ uvx --from 'shipmate[fireworks]' shipmate --model fireworks:accounts/fireworks/models/kimi-k3
+$ uvx --from 'shipmate[ollama]' shipmate --model ollama:qwen3
 ```
 
 ## How it's built
 
-About a thousand lines of Python you can read in one sitting.
+About 1,100 lines of Python you can read in one sitting.
 
 ```
 src/shipmate/

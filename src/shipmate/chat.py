@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from charter import Tool
+from charter import Tool, qualified_names
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from rich.console import Console
 from rich.markdown import Markdown
@@ -19,6 +19,7 @@ from shipmate import routines
 from shipmate.agent import build_agent, watch
 from shipmate.apps import connected, load_tools
 from shipmate.background import scheduler
+from shipmate.policy import is_read
 
 console = Console()
 
@@ -37,9 +38,12 @@ def show(message: BaseMessage) -> None:
     if isinstance(message, AIMessage):
         for call in message.tool_calls:
             if call["name"] == "ToolSearch":
-                console.print(
-                    f"  [dim]⌕ looking for tools: {escape(str(call['args'].get('query', '')))}[/]"
-                )
+                query = str(call["args"].get("query", ""))
+                if query.startswith("select:"):  # the model named the tools it wants
+                    what = "loading " + query.removeprefix("select:").replace(",", ", ")
+                else:
+                    what = f"looking for tools: {query}"
+                console.print(f"  [dim]⌕ {escape(what)}[/]")
             else:
                 console.print(f"  [dim]↳ {call['name']}({escape(short(call['args']))})[/]")
         if message.text.strip():
@@ -77,6 +81,16 @@ async def ask(name: str, target: Tool, args: dict) -> str:
             return "always"
 
 
+def tally(messages: list[BaseMessage], api: set[str], writes: set[str]) -> str:
+    """What this turn actually did, counted from tool results, not from the model's words."""
+    ran = [m.name for m in messages if isinstance(m, ToolMessage) and m.status != "error"]
+    changed = [name for name in ran if name in writes]
+    reads = sum(1 for name in ran if name in api and name not in writes)
+    parts = [f"{reads} read{'s' if reads != 1 else ''}"] if reads else []
+    parts.append(f"changed: {', '.join(changed)}" if changed else "no changes")
+    return " · ".join(parts)
+
+
 def on_report(routine: dict, path: Path) -> None:
     console.print(f"\n[green]📬 routine #{routine['id']} finished[/] [dim]→ {path}[/]")
 
@@ -85,10 +99,15 @@ async def chat(model: Any, model_label: str) -> None:
     apps = connected()
     tools = watch(load_tools(apps))
     agent = build_agent(model, apps, tools, ask)
+    api = qualified_names(tools)
+    writes = {name for name, t in api.items() if not is_read(t)}
     names = ", ".join(app.key for app in apps) or "none (run `shipmate connect`)"
     console.print(
         f"[bold]Shipmate[/] [dim]· {model_label} · apps: {names} · {len(tools)} tools · /help[/]"
     )
+    examples = [app.example for app in apps if app.example][:2]
+    if examples:
+        console.print("[dim]Try: " + "  ·  ".join(f"“{escape(e)}”" for e in examples) + "[/]")
 
     background = asyncio.create_task(scheduler(model, on_report))
     history: list[BaseMessage] = []
@@ -127,6 +146,7 @@ async def chat(model: Any, model_label: str) -> None:
                         show(message)
                     seen = len(messages)
                     history = messages
+                console.print(f"  [dim]· {tally(history[len(before) :], set(api), writes)}[/]\n")
             except Exception as exc:  # a failed turn should not end the chat
                 # Back to before this message: a turn cut off between a tool call
                 # and its result would be refused by the model on the next one.

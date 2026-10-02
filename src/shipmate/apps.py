@@ -24,6 +24,7 @@ class App:
     how: str
     verify: str | None = None  # a cheap read, "pack.tool", run once after connecting
     connected_if: Callable[[], bool] | None = None
+    example: str = ""  # something to try first
 
     def is_connected(self) -> bool:
         if self.connected_if is not None:
@@ -49,6 +50,7 @@ APPS: tuple[App, ...] = (
         "Signs in through your browser with your own Google OAuth client. "
         "`shipmate connect google` walks you through it.",
         verify="gmail.labels_list",
+        example="What's on my calendar tomorrow, and is anything in my inbox about it?",
         connected_if=_google_connected,
     ),
     App(
@@ -58,6 +60,7 @@ APPS: tuple[App, ...] = (
         ("SLACK_BOT_TOKEN",),
         "api.slack.com/apps → your app → OAuth & Permissions → Bot User OAuth Token (xoxb-…)",
         verify="slack.users_list",
+        example="What did I miss on Slack today?",
     ),
     App(
         "github",
@@ -66,6 +69,7 @@ APPS: tuple[App, ...] = (
         ("GITHUB_TOKEN",),
         "github.com/settings/tokens, or press Enter to reuse the GitHub CLI's login",
         verify="github.users_get_authenticated",
+        example="What needs my attention on GitHub today?",
     ),
     App(
         "linear",
@@ -74,6 +78,7 @@ APPS: tuple[App, ...] = (
         ("LINEAR_API_KEY",),
         "linear.app → Settings → Security & access → Personal API keys",
         verify="linear.viewer",
+        example="What Linear issues are assigned to me and not started yet?",
     ),
     App(
         "notion",
@@ -83,6 +88,7 @@ APPS: tuple[App, ...] = (
         "notion.so/profile/integrations → New integration → Internal secret "
         "(then share the pages it may read with that integration)",
         verify="notion.users_retrieve_me",
+        example="Find my notes about the roadmap.",
     ),
     App(
         "stripe",
@@ -91,6 +97,7 @@ APPS: tuple[App, ...] = (
         ("STRIPE_API_KEY",),
         "dashboard.stripe.com/apikeys. A restricted key, or a test-mode key to start.",
         verify="stripe.balance_retrieve",
+        example="How much came in this week, and did any payment fail?",
     ),
     App(
         "shopify",
@@ -99,6 +106,7 @@ APPS: tuple[App, ...] = (
         ("SHOPIFY_SHOP", "SHOPIFY_ACCESS_TOKEN"),
         "Your store's admin → Apps → Develop apps → Admin API access token",
         verify="shopify.shop_get",
+        example="How many orders came in today?",
     ),
     App(
         "granola",
@@ -107,6 +115,7 @@ APPS: tuple[App, ...] = (
         ("GRANOLA_API_KEY",),
         "Granola → Settings → API",
         verify="granola.notes_list",
+        example="What did we decide in my last meeting?",
     ),
     App(
         "tavily",

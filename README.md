@@ -4,11 +4,15 @@
 
 ### OpenAI Dots and Grok Bot, open source, on your laptop.
 
+<a href="https://github.com/r28ai/charter"><img src="https://img.shields.io/badge/built_on-Charter-C72C41?style=for-the-badge" alt="Built on Charter"></a>
+
 Your keys, your machine, nobody in between. It reads your email, calendar, GitHub, Slack and Linear,<br>
 and asks before it changes anything, even when you tell it not to.
 
-<sub>Shipmate is the showcase app for <a href="https://github.com/r28ai/charter">Charter</a>, the library its 550 tools come from.
-It's maintained as an example, not a product with a roadmap.</sub>
+**All 550 tools come from [Charter](https://github.com/r28ai/charter), the open-source library behind Shipmate.<br>
+Building your own agent? Charter gives it the same tools. ⭐ [Star Charter on GitHub](https://github.com/r28ai/charter)**
+
+<sub>Shipmate is maintained as an example, not a product with a roadmap.</sub>
 
 </div>
 
